@@ -8,6 +8,7 @@ export default function DashboardLayout({
     darkMode,
     setDarkMode,
     onLogout,
+    isAdmin,
 }) {
     return (
         <div
@@ -27,6 +28,7 @@ export default function DashboardLayout({
                 setActiveTab={setActiveTab}
                 darkMode={darkMode}
                 onLogout={onLogout}
+                isAdmin={isAdmin}
             />
 
             <div className="ml-64">

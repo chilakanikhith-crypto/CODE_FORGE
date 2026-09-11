@@ -37,3 +37,8 @@ lerna-debug.log*
 *.sln
 *.sw?
 .jupiter/
+
+# Documentation ignored from repository
+README.md
+README*.md
+src/components/README*.md

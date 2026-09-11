@@ -5,13 +5,16 @@ import Login from "./pages/Login";
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [session, setSession] = useState({ user: null, token: null });
 
-  const handleLogin = () => {
+  const handleLogin = (user, token) => {
+    setSession({ user, token });
     setIsLoggedIn(true);
   };
 
   const handleLogout = () => {
     setIsLoggedIn(false);
+    setSession({ user: null, token: null });
   };
 
   if (!isLoggedIn) {
@@ -25,6 +28,8 @@ export default function App() {
   return (
     <Dashboard
       onLogout={handleLogout}
+      user={session.user}
+      token={session.token}
     />
   );
 }

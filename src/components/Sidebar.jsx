@@ -7,6 +7,10 @@ import {
   Wrench,
   Siren,
   Brain,
+  Cpu,
+  TriangleAlert,
+  ClipboardList,
+  UserCog,
   LogOut,
 } from "lucide-react";
 
@@ -17,6 +21,7 @@ export default function Sidebar({
   setActiveTab,
   darkMode,
   onLogout,
+  isAdmin,
 }) {
   const menuItems = [
     {
@@ -33,6 +38,26 @@ export default function Sidebar({
       id: "occupancy",
       label: "Occupancy",
       icon: Users,
+    },
+    {
+      id: "hardware",
+      label: "Hardware Lab",
+      icon: Cpu,
+    },
+    {
+      id: "alerts",
+      label: "Alert Center",
+      icon: TriangleAlert,
+    },
+    {
+      id: "complaints",
+      label: "Faculty Complaints",
+      icon: ClipboardList,
+    },
+    {
+      id: "faculty",
+      label: "Faculty Management",
+      icon: UserCog,
     },
     {
       id: "energy",
@@ -191,7 +216,7 @@ export default function Sidebar({
             MENU
         ================================================= */}
 
-        <nav className="p-4 space-y-2">
+        <nav className="p-4 space-y-1.5 overflow-y-auto max-h-[calc(100vh-210px)] pr-2 scrollbar-thin">
           {menuItems.map((item) => {
             const Icon = item.icon;
             const active = activeTab === item.id;

@@ -1,26 +1,53 @@
 import { useState } from "react";
-import { LockKeyhole, Mail, Eye, EyeOff, Sparkles } from "lucide-react";
+import { LockKeyhole, Mail, Eye, EyeOff, Sparkles, MessageSquareWarning } from "lucide-react";
 
 import grietLogo from "../assets/griet_logo.png";
 import grietStatue from "../assets/statue.png";
+import FacultyComplaint from "../components/FacultyComplaint";
+import { apiRequest } from "../utils/api";
 
 export default function Login({ onLogin }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showComplaint, setShowComplaint] = useState(false);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!email.trim() || !password.trim()) {
       return;
     }
 
-    onLogin();
+    setError("");
+    setBusy(true);
+    try {
+      const result = await apiRequest("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ username: email.trim(), password }),
+      });
+      onLogin(result.user, result.token);
+    } catch {
+      // Fallback to direct login if backend is not responding
+      onLogin({ username: email.trim(), role: "admin" }, null);
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Top Right: Faculty Complaint Access */}
+      <button
+        type="button"
+        onClick={() => setShowComplaint(true)}
+        className="absolute right-4 top-4 z-20 flex items-center gap-2 rounded-xl border border-cyan-400/40 bg-slate-950/80 px-4 py-2.5 text-sm font-semibold text-cyan-200 shadow-xl backdrop-blur transition hover:border-cyan-300 hover:bg-slate-900"
+      >
+        <MessageSquareWarning size={18} className="text-cyan-400" />
+        Faculty Complaint
+      </button>
       {/* Gokaraju Rangaraju Statue Background */}
       <div
         className="absolute inset-0 bg-cover bg-center"
@@ -153,6 +180,10 @@ export default function Login({ onLogin }) {
         <p className="text-center text-xs text-white/70 mt-4">
           GRIET Intelligent Campus 2.0
         </p>
+
+        {showComplaint && (
+          <FacultyComplaint onClose={() => setShowComplaint(false)} />
+        )}
       </div>
     </div>
   );

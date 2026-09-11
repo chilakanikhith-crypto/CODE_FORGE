@@ -4,23 +4,75 @@ import jwt from "jsonwebtoken";
 
 const router = express.Router();
 
-/*
-  GRIET Intelligent Campus
-  Faculty Login
+export const users = [];
 
-  Username = Faculty S.No.
-  Password = 1234
-
-  S.No. 1 to 322
-*/
-
-// Create users 1 to 322
-const users = Array.from({ length: 322 }, (_, index) => ({
-  id: index + 1,
-  username: String(index + 1),
+users.push({
+  id: "faculty-1",
+  username: "1",
+  name: "Demo Faculty",
+  department: "Computer Science",
+  email: "faculty1@griet.ac.in",
   passwordHash: bcrypt.hashSync("1234", 10),
   role: "faculty",
-}));
+  active: true,
+});
+
+users.push({
+  id: "admin",
+  username: "admin",
+  passwordHash: bcrypt.hashSync("admin123", 10),
+  role: "admin",
+});
+
+export function getFacultyById(facultyId) {
+  return users.find(
+    (user) => user.role === "faculty" && user.username === String(facultyId).trim()
+  );
+}
+
+export function toPublicUser(user) {
+  return {
+    id: user.id,
+    username: user.username,
+    role: user.role,
+    name: user.name,
+    department: user.department,
+    email: user.email,
+    active: user.active,
+  };
+}
+
+export function authenticateToken(req, res, next) {
+  const authorization = req.headers.authorization;
+  const token = authorization && authorization.startsWith("Bearer ")
+    ? authorization.slice(7)
+    : null;
+
+  if (!token) {
+    return res.status(401).json({ success: false, message: "Authentication required" });
+  }
+
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    return res.status(500).json({ success: false, message: "JWT_SECRET is not configured" });
+  }
+
+  try {
+    req.user = jwt.verify(token, secret);
+    return next();
+  } catch {
+    return res.status(401).json({ success: false, message: "Invalid or expired authentication token" });
+  }
+}
+
+export function requireRole(role) {
+  return (req, res, next) => {
+    if (req.user?.role !== role) {
+      return res.status(403).json({ success: false, message: `${role} access required` });
+    }
+    return next();
+  };
+}
 
 // =====================================================
 // LOGIN
@@ -39,16 +91,20 @@ router.post("/login", async (req, res) => {
       });
     }
 
-    // Find user by S.No.
-    const user = users.find(
-      (item) => item.username === String(username).trim()
-    );
+    const user = users.find((item) => item.username === String(username).trim());
 
     // User not found
     if (!user) {
       return res.status(401).json({
         success: false,
         message: "Invalid username or password",
+      });
+    }
+
+    if (user.role === "faculty" && !user.active) {
+      return res.status(403).json({
+        success: false,
+        message: "This faculty account is inactive. Contact an administrator.",
       });
     }
 
@@ -78,9 +134,7 @@ router.post("/login", async (req, res) => {
     // Create login token
     const token = jwt.sign(
       {
-        id: user.id,
-        username: user.username,
-        role: user.role,
+        ...toPublicUser(user),
       },
       secret,
       {

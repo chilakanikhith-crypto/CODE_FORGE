@@ -51,6 +51,29 @@ const WeatherWidget = React.lazy(
   () => import("../components/WeatherWidget")
 );
 
+const HardwareSensors = React.lazy(
+  () => import("../components/HardwareSensors")
+);
+
+const AlertCenter = React.lazy(
+  () => import("../components/AlertCenter")
+);
+
+const StudentCountController = React.lazy(
+  () => import("../components/StudentCountController")
+);
+
+const ComplaintManagement = React.lazy(
+  () => import("../components/ComplaintManagement")
+);
+
+const FacultyManagement = React.lazy(
+  () => import("../components/FacultyManagement")
+);
+
+import { getFaculty, subscribeToFaculty } from "../utils/facultyStorage";
+import { getComplaints, subscribeToComplaints } from "../utils/complaintStorage";
+
 // =====================================================
 // PAGE LOADER
 // =====================================================
@@ -67,7 +90,7 @@ function PageLoader() {
 // DASHBOARD
 // =====================================================
 
-export default function Dashboard({ onLogout }) {
+export default function Dashboard({ onLogout, token }) {
   const [buildings, setBuildings] =
     useState(initialBuildings);
 
@@ -82,6 +105,123 @@ export default function Dashboard({ onLogout }) {
 
   const [selectedBuilding, setSelectedBuilding] =
     useState(initialBuildings[0]);
+
+  // ===================================================
+  // CAMPUS ALERTS STATE
+  // ===================================================
+  const [alerts, setAlerts] = useState([
+    {
+      id: 1,
+      type: "electrical",
+      level: "Critical",
+      color: "border-red-500 bg-red-500/15",
+      icon: "⚡",
+      title: "Lab 3 High Current Surge",
+      building: "Block 2 Substation",
+      message:
+        "SCT-013 CT hardware sensor read 18.4A (above nominal 12.0A limit). Electrical arcing risk detected in laboratory distribution panel.",
+      time: "5 mins ago",
+      status: "unacknowledged",
+      resolved: false,
+    },
+    {
+      id: 2,
+      type: "overcrowding",
+      level: "Warning",
+      color: "border-yellow-500 bg-yellow-500/15",
+      icon: "👥",
+      title: "Block 1 High Occupancy",
+      building: "Block 1 Main Block",
+      message:
+        "PIR optical beam sensors logged foot-traffic exceeding 85% of rated capacity. Automated ventilation activated.",
+      time: "18 mins ago",
+      status: "acknowledged",
+      resolved: false,
+    },
+    {
+      id: 3,
+      type: "water",
+      level: "Info",
+      color: "border-cyan-500 bg-cyan-500/15",
+      icon: "💧",
+      title: "Underground Reservoir Refilled",
+      building: "Block 4 Tank",
+      message:
+        "JSN-SR04T ultrasonic sensor confirmed water depth at 88% capacity. Automated inlet valve closed.",
+      time: "45 mins ago",
+      status: "acknowledged",
+      resolved: false,
+    },
+  ]);
+
+  const handleAddAlert = (newAlert) => {
+    setAlerts((prev) => [newAlert, ...prev]);
+    if (newAlert.building) {
+      setBuildings((prev) =>
+        prev.map((b) =>
+          newAlert.building.toLowerCase().includes(b.name.toLowerCase())
+            ? { ...b, status: newAlert.level === "Critical" ? "red" : "yellow" }
+            : b
+        )
+      );
+    }
+  };
+
+  const handleResolveAlert = (alertId) => {
+    setAlerts((prev) =>
+      prev.map((a) => (a.id === alertId ? { ...a, resolved: true } : a))
+    );
+  };
+
+  const handleAcknowledgeAlert = (alertId) => {
+    setAlerts((prev) =>
+      prev.map((a) => (a.id === alertId ? { ...a, status: "acknowledged" } : a))
+    );
+  };
+
+  const handleClearAllAlerts = () => {
+    setAlerts((prev) => prev.map((a) => ({ ...a, resolved: true })));
+    setBuildings((prev) => prev.map((b) => ({ ...b, status: "green" })));
+  };
+
+  const handleUpdateBuildings = (newBuildings) => {
+    setBuildings(newBuildings);
+  };
+
+  const handleIncrementStudent = () => {
+    setBuildings((prev) =>
+      prev.map((b, idx) => (idx === 0 ? { ...b, students: b.students + 1 } : b))
+    );
+  };
+
+  // ===================================================
+  // FACULTY & COMPLAINT METRICS
+  // ===================================================
+  const [facultyCount, setFacultyCount] = useState(() => getFaculty().length);
+  const [openComplaints, setOpenComplaints] = useState(
+    () =>
+      getComplaints().filter(
+        (complaint) => !["Resolved", "Rejected"].includes(complaint.status)
+      ).length
+  );
+
+  useEffect(() => {
+    const updateFacultyCount = (fac) => setFacultyCount(fac.length);
+    const updateOpenComplaints = (comp) =>
+      setOpenComplaints(
+        comp.filter(
+          (complaint) => !["Resolved", "Rejected"].includes(complaint.status)
+        ).length
+      );
+    updateFacultyCount(getFaculty());
+    updateOpenComplaints(getComplaints());
+    const unsubscribeFaculty = subscribeToFaculty(updateFacultyCount);
+    const unsubscribeComplaints = subscribeToComplaints(updateOpenComplaints);
+    return () => {
+      unsubscribeFaculty();
+      unsubscribeComplaints();
+    };
+  }, []);
 
   // ===================================================
   // INITIAL LOADING
@@ -205,11 +345,9 @@ export default function Dashboard({ onLogout }) {
         )
       : 0;
 
-  const totalAlerts =
-    buildings.filter(
-      (building) =>
-        building.status === "red"
-    ).length;
+  const totalAlerts = alerts.filter(
+    (alert) => !alert.resolved
+  ).length;
 
   // ===================================================
   // LOADING SCREEN
@@ -269,6 +407,7 @@ export default function Dashboard({ onLogout }) {
       darkMode={darkMode}
       setDarkMode={setDarkMode}
       onLogout={onLogout}
+      isAdmin={true}
     >
 
       <div
@@ -343,19 +482,26 @@ export default function Dashboard({ onLogout }) {
                   grid
                   grid-cols-1
                   sm:grid-cols-2
-                  xl:grid-cols-4
-                  gap-6
+                  lg:grid-cols-3
+                  xl:grid-cols-6
+                  gap-5
                 "
               >
 
-                <KPICard
-                  title="Students / Intake"
-                  value={totalStudents}
-                  color="text-cyan-400"
-                  status="Live"
-                  icon={<Users size={40} />}
-                  darkMode={darkMode}
-                />
+                <div
+                  onClick={() => setActiveTab("occupancy")}
+                  className="cursor-pointer transition-transform hover:scale-[1.02]"
+                  title="Click to open Dynamic Student Count Controller"
+                >
+                  <KPICard
+                    title="Students / Intake"
+                    value={totalStudents}
+                    color="text-cyan-400"
+                    status="Interactive Live"
+                    icon={<Users size={40} />}
+                    darkMode={darkMode}
+                  />
+                </div>
 
                 <KPICard
                   title="Energy Usage"
@@ -375,16 +521,50 @@ export default function Dashboard({ onLogout }) {
                   darkMode={darkMode}
                 />
 
-                <KPICard
-                  title="Alerts"
-                  value={totalAlerts}
-                  color="text-red-400"
-                  status="Attention"
-                  icon={
-                    <TriangleAlert size={40} />
-                  }
-                  darkMode={darkMode}
-                />
+                <div
+                  onClick={() => setActiveTab("alerts")}
+                  className="cursor-pointer transition-transform hover:scale-[1.02]"
+                  title="Click to open Campus Alert Center"
+                >
+                  <KPICard
+                    title="Alerts"
+                    value={totalAlerts}
+                    color="text-red-400"
+                    status={totalAlerts > 0 ? "Attention Required" : "All Clear"}
+                    icon={<TriangleAlert size={40} />}
+                    darkMode={darkMode}
+                  />
+                </div>
+
+                <div
+                  onClick={() => setActiveTab("faculty")}
+                  className="cursor-pointer transition-transform hover:scale-[1.02]"
+                  title="Click to view Faculty Management"
+                >
+                  <KPICard
+                    title="Total Faculty"
+                    value={facultyCount}
+                    color="text-emerald-400"
+                    status="Registered"
+                    icon={<Users size={40} />}
+                    darkMode={darkMode}
+                  />
+                </div>
+
+                <div
+                  onClick={() => setActiveTab("complaints")}
+                  className="cursor-pointer transition-transform hover:scale-[1.02]"
+                  title="Click to view Faculty Complaints"
+                >
+                  <KPICard
+                    title="Open Complaints"
+                    value={openComplaints}
+                    color="text-orange-400"
+                    status={openComplaints > 0 ? "Needs Review" : "All Resolved"}
+                    icon={<ShieldAlert size={40} />}
+                    darkMode={darkMode}
+                  />
+                </div>
 
               </div>
 
@@ -607,6 +787,16 @@ export default function Dashboard({ onLogout }) {
           {activeTab === "occupancy" && (
 
             <div className="space-y-6">
+
+              {/* DYNAMIC STUDENT CONTROLLER */}
+              <Suspense fallback={<PageLoader />}>
+                <StudentCountController
+                  buildings={buildings}
+                  onUpdateBuildings={handleUpdateBuildings}
+                  darkMode={darkMode}
+                  onTriggerAlert={handleAddAlert}
+                />
+              </Suspense>
 
               <div
                 className={`
@@ -1069,6 +1259,79 @@ export default function Dashboard({ onLogout }) {
                 />
 
               </div>
+
+            </Suspense>
+
+          )}
+
+          {/* =================================================
+              HARDWARE PROTOTYPE LAB (STRICTLY HARDWARE)
+          ================================================= */}
+
+          {activeTab === "hardware" && (
+
+            <Suspense fallback={<PageLoader />}>
+
+              <HardwareSensors
+                darkMode={darkMode}
+                onTriggerAlert={handleAddAlert}
+                onIncrementStudent={handleIncrementStudent}
+              />
+
+            </Suspense>
+
+          )}
+
+          {/* =================================================
+              ALERT CENTER (SHOW DIFFERENT ALERTS & ACTIONS)
+          ================================================= */}
+
+          {activeTab === "alerts" && (
+
+            <Suspense fallback={<PageLoader />}>
+
+              <AlertCenter
+                alerts={alerts}
+                onAddAlert={handleAddAlert}
+                onResolveAlert={handleResolveAlert}
+                onAcknowledgeAlert={handleAcknowledgeAlert}
+                onClearAllAlerts={handleClearAllAlerts}
+                darkMode={darkMode}
+              />
+
+            </Suspense>
+
+          )}
+
+          {/* =================================================
+              FACULTY COMPLAINTS
+          ================================================= */}
+
+          {activeTab === "complaints" && (
+
+            <Suspense fallback={<PageLoader />}>
+
+              <ComplaintManagement
+                token={token}
+                darkMode={darkMode}
+              />
+
+            </Suspense>
+
+          )}
+
+          {/* =================================================
+              FACULTY MANAGEMENT
+          ================================================= */}
+
+          {activeTab === "faculty" && (
+
+            <Suspense fallback={<PageLoader />}>
+
+              <FacultyManagement
+                token={token}
+                darkMode={darkMode}
+              />
 
             </Suspense>
 
